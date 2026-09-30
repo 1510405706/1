@@ -18,18 +18,18 @@ em=function(W,s)
   s
 }
 
-iter = function(W, s, tol = 0.0001) {
-  diff = 1
-  while (diff > tol) {
-    s_next = em(W, s)
-    diff   = max(abs(s - s_next))  # check max absolute difference across all 5 parameters
-    s      = s_next
+iter = function(W, s)
+{
+  repeat
+  {
+    s1 = em(W, s)
+
+    if(max(abs(s1 - s)) < 0.0001)
+      return(s1)
+
+    s = s1
   }
-  return(s)
 }
-
-
-
 iter(W,s)
 
 
