@@ -82,26 +82,9 @@ Nitrogen <- factor(rep(rep(c("n0", "n1", "n2", "n3"), each = 4), times = 3), ord
 df <- data.frame(Rep, Variety, Nitrogen, Yield)
 
 ########### Split plot design
-spd_model <- aov(Yield ~ Rep + Variety * Nitrogen + Error(Rep/Variety), data = df)
+spd_model <- aov(Yield ~ Rep + Variety * Nitrogen + Error(Rep:Variety), data = df)
 
-summary(spd_model, split = list(
-  Variety = list(
-    "V_Linear"    = 1, 
-    "V_Quadratic" = 2
-  ),
-  Nitrogen = list(
-    "N_Linear"    = 1, 
-    "N_Quadratic" = 2, 
-    "N_Cubic"     = 3
-  ),
-  "Variety:Nitrogen" = list(
-    "VL x NL" = 1, "VL x NQ" = 2, "VL x NC" = 3,
-    "VQ x NL" = 4, "VQ x NQ" = 5, "VQ x NC" = 6
-  )
-))
-
-
-
+summary(spd_model) 
 
 
 
