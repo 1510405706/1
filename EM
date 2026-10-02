@@ -1,102 +1,174 @@
-###########Problem_5###############
+#Split-Plot Experiment (Example 17)
 
-data(faithful)
-attach(faithful)
-head(faithful)
-# EM Algorithm
-W= waiting
-s=c(0.4,40,90,16,16)	# initial value of the parameters
-em=function(W,s)
-{
-  Ep=s[1]*dnorm(W,s[2],sqrt(s[4]))/(s[1]*dnorm(W,s[2],sqrt(s[4])) 
-                                    +(1-s[1])*dnorm(W,s[3],sqrt(s[5])))
-  s[1]= mean(Ep)
-  s[2]= sum(Ep*W)/sum(Ep)
-  s[3]= sum((1-Ep)*W)/sum(1-Ep)
-  s[4]= sum(Ep*(W-s[2])^2)/sum(Ep)
-  s[5]= sum((1-Ep)*(W-s[3])^2)/sum(1-Ep)
-  s
-}
+Data <- c(
+  2.17, 1.88, 1.62, 2.34,
+  1.58, 1.26, 1.22, 1.59,
+  2.29, 1.60, 1.67, 1.91,
+  
+  2.33, 2.01, 1.70, 1.78,
+  1.38, 1.30, 1.85, 1.09, 
+  1.86, 1.70, 1.81, 1.54,
+  
+  1.75, 1.95, 2.13, 1.78,
+  1.52, 1.47, 1.80, 1.37,
+  1.55, 1.61, 1.82, 1.56 
+)
 
-iter = function(W, s)
-{
-  repeat
-  {
-    s1 = em(W, s)
+#Factor Setup
+Temp <- factor(rep(c("Low", "Medium", "High"), each = 12), levels = c("Low", "Medium", "High"))
+Elec <- factor(rep(rep(c("A", "B", "C"), each = 4), times = 3))
+Replicate   <- factor(rep(1:4, times = 9))
 
-    if(max(abs(s1 - s)) < 0.0001)
-      return(s1)
+df <- data.frame(Replicate, Temp, Elec, Data)
 
-    s = s1
-  }
-}
-iter(W,s)
+# 11 Orthogonal components
+
+model <- aov(Data ~ Replicate + Temp * Elec, data = df)
+
+# ৪. Orthogonal Components ভেঙে ANOVA Table প্রদর্শন (Image 2 এর নিয়মে)
+summary(model, split = list(
+  Temp = list(
+    "T_Linear"    = 1,
+    "T_Quadratic" = 2
+  ),
+  Elec = list(
+    "E_Linear"    = 1,
+    "E_Quadratic" = 2
+  ),
+  "Temp:Elec" = list(
+    "TL x EL" = 1,
+    "TL x EQ" = 2,
+    "TQ x EL" = 3,
+    "TQ x EQ" = 4
+  )
+))
 
 
 
-#############Problem_8###############
-x = c(1.95, 0.22, -0.9, -0.52, -0.31, -0.22, 1.75, 0.18, 0.10, 1.25,  1.14, -0.79, -1.61, 0.78, 0.69,-0.60, 0.30, 0.26, 1.34, -0.76)
-m=array(1:20)
-d=array(1:20)
-R=array(1:20)
-a=0.05
-b=0.10
-LA=log((1-b)/a)
-LB=log(b/(1-a))  
-R[1]=x[1]-0.5
-m[1]=1
-for(i in 1:20){
-  if(R[i]>LA){
-    d[i]='H1 is accepted'
-    break
-  }
-  else if (R[i]<LB){
-    d[i]="H0 accepted"
-    break
-  }
-  else {
-    d[i]="Continue"
-    R[i+1]=R[i]+x[i+1]-0.5
-    m[i+1] <- m[i]+1
-  }
-}
+#Split-Plot ANOVA Model
+split_model <- aov(Data ~ Replicate + Temp * Elec + Error(Replicate:Temp), data = df)
 
-iter <- data.frame(m,R,d)
-iter
-
-###average sample number
-
-ASN0=(a*LA+(1-a)*LB)/(-.5)
-ASN1=((1-b)*LA+b*LB)/(.5)
-ASN0
-ASN1
-
-###OC function
-
-h0=0
-h1=1
-A=(1-b)/a
-B=b/(1-a)
-Ltheta=function(theta){
-  (A^((h1+h0-2*theta)/(h1-h0))-1)/(A^((h1+h0-2*theta)/
-                                        (h1-h0))-B^((h1+h0-2*theta)/(h1-h0)))
-}
-Ltheta
-theta=c(-.5,-.25,0,.25,.4,.6,.75,1,1.25,1.5)
-Ltheta(theta)
-plot(theta,Ltheta(theta),xlab="theta",ylab="L(theta)",type="b")
-
-##ASN value
-
-ASN=function(theta){
-  (Ltheta(theta)*LB+(1-Ltheta(theta))*LA)/(theta-.5)
-}
-theta1=seq(-3,3,.01)
-plot(theta1,ASN(theta1),xlab="theta",ylab="ASN(theta)",type="l")
+# ANOVA Table
+summary(split_model)
 
 
 
 
 
 
+###################Problem_2
+Yield <- c(
+  104, 117, 123, 105, 
+  105, 129, 124, 135,  
+  112, 153, 151, 129,  
+  146, 139, 164, 143,  
+  
+  112, 111, 119, 124, 
+  109, 123, 109, 129,  
+  125, 134, 159, 133,  
+  161, 141, 158, 139,  
+  
+  116, 119, 102, 135,  
+  119, 132, 116, 143,  
+  121, 143, 167, 142, 
+  159, 149, 161, 158   
+)
+
+# Factor & Polynomial Contrasts Set up
+Rep      <- factor(rep(1:4, times = 12))
+Variety  <- factor(rep(c("V1", "V2", "V3"), each = 16), ordered = TRUE)
+Nitrogen <- factor(rep(rep(c("n0", "n1", "n2", "n3"), each = 4), times = 3), ordered = TRUE)
+
+df <- data.frame(Rep, Variety, Nitrogen, Yield)
+
+########### Split plot design
+spd_model <- aov(Yield ~ Rep + Variety * Nitrogen + Error(Rep/Variety), data = df)
+
+summary(spd_model, split = list(
+  Variety = list(
+    "V_Linear"    = 1, 
+    "V_Quadratic" = 2
+  ),
+  Nitrogen = list(
+    "N_Linear"    = 1, 
+    "N_Quadratic" = 2, 
+    "N_Cubic"     = 3
+  ),
+  "Variety:Nitrogen" = list(
+    "VL x NL" = 1, "VL x NQ" = 2, "VL x NC" = 3,
+    "VQ x NL" = 4, "VQ x NQ" = 5, "VQ x NC" = 6
+  )
+))
+
+
+
+
+
+
+
+#General Two-Factor Factorial (RCBD) ANOVA (১১টি Component-সহ)
+
+rcbd_model <- aov(Yield ~ Rep + Variety * Nitrogen, data = df)
+
+summary(rcbd_model, split = list(
+  Variety = list(
+    "V_Linear"    = 1, 
+    "V_Quadratic" = 2
+  ),
+  Nitrogen = list(
+    "N_Linear"    = 1, 
+    "N_Quadratic" = 2, 
+    "N_Cubic"     = 3
+  ),
+  "Variety:Nitrogen" = list(
+    "VL x NL" = 1, "VL x NQ" = 2, "VL x NC" = 3,
+    "VQ x NL" = 4, "VQ x NQ" = 5, "VQ x NC" = 6
+  )
+))
+
+
+
+
+
+
+
+#######################BIBD_Example_27 
+b <- gl(10, 3)
+t <- factor(c("A","B","C", "A","B","D", "A","B","E", "A","C","D", "A","C","E", 
+              "A","D","E", "B","C","D", "B","C","E", "B","D","E", "C","D","E"))
+y <- c(27,26,30, 28,26,29, 30,29,26, 31,34,33, 29,32,24, 30,34,25, 30,34,31, 21,31,23, 26,33,24, 33,31,26)
+
+#(i) ANOVA Table
+m <- lm(y ~ b + t)
+anova(m)
+
+
+v <- 5
+b_num <- 10
+k <- 3
+r <- 6
+lambda <- 3
+E <-(lambda*v)/(r*k)  
+
+# Q_j (Adjusted Treatment Totals)
+T_j <- tapply(y, t, sum)
+B_tj <-tapply(tapply(y, b, sum)[b], t, sum)
+Q <- T_j - B_tj / k
+
+
+#(ii) 
+s <- sigma(m)  # s = sqrt(MSE) 
+t_calc <- (Q["A"] - Q["E"]) / (s * sqrt(2 * r * E))
+t_calc
+
+# (iii)Intrablock and Interblock
+
+tau2_intra <- Q["B"] / (r * E)  # Intrablock estimate
+tau2_intra
+
+# B_t2 = Sum of blocks which have Treatment B 
+blocks_with_B <- unique(b[t == "B"])
+B_t2 <- sum(y[b %in% blocks_with_B])
+tau2_inter <- (B_t2 - r * k * mean(y)) / (r - lambda)  # Interblock estimate
+tau2_inter
 
