@@ -315,3 +315,47 @@ v=s2_y +((R_hat^2)*s2_x) - (2*R_hat*s_xy);v
 v_prim=2*R_hat*s_xy-(R_hat^2)*s2_x;v_prim
 
 propor=sqrt(cost_ratio*(v/v_prim));propor
+
+
+
+####
+# Regression Coefficient (b) & Estimate
+b <- s_xy / s2_x; b
+y_bar_ld <- y_bar_n + b * (x_bar_prime - x_bar_n)
+y_bar_ld
+
+# Convert per-cut (1/100 acre) to per-acre
+avg_yield_acre <- y_bar_ld * 100
+avg_yield_acre
+
+# Correlation coefficient (r)
+r <- s_xy / sqrt(s2_x * s2_y); r
+r2 <- r^2; r2
+
+# Variance for Double Sampling Regression
+# var = (s2_y * (1 - r^2) / n) + (s2_y * r^2 / n_prime)
+var_ld <- (s2_y * (1 - r2) / n) + (s2_y * r2 / n_prime); var_ld
+
+est_var = var_ld * 100^2; est_var
+sampling_error <- sqrt(est_var); sampling_error
+
+# Relative Precision / Gain in Efficiency
+var_simple <- (1/n) * s2_y
+precision_gain <- (var_simple / var_ld) - 1
+precision_gain
+
+#(iii)
+
+# Cost ratio (c/c')
+cost_ratio <- 1.5 # Dry weight cost / Harvest weight cost
+
+# Using the formula for optimum n/n' in regression estimation
+# n/n' = sqrt( (c'/c) * (v / v_prim) )
+
+v = s2_y * (1 - r2); v
+v_prim = s2_y * r2; v_prim
+
+propor = sqrt((1/cost_ratio) * (v/v_prim)); propor
+
+
+
