@@ -1,135 +1,264 @@
-install.packages(c("ca","mixtools","fastICA"))
-library(ca)
-library(mixtools)
-library(MASS)
-library(fastICA)
-
-####################Problem_1
-X=matrix(c(5,5,30,5,25,5,15,5,5,15,5,0),nrow=4,byrow=T)
-rownames(X)=c("WhatsApp","Instagram","TikTok","Telegram")
-colnames(X)=c("Teens","Adults","Seniors")
-X
-P=X/sum(X);P
-r=apply(P,1,sum);r
-c=apply(P,2,sum);c
-Dr=diag(r)
-Dc=diag(c)
-S=sqrt(solve(Dr))%*%(P-r%*%t(c))%*%sqrt(solve(Dc))
-
-svd.s=svd(S)
-U=svd.s$u
-d=svd.s$d  #Singular value Consider just non zero values
-V=svd.s$v
-
-l_k=d^2;l_k
-Total_inertias=sum(l_k);Total_inertias
-
-Da=diag(d)
-F=sqrt(solve(Dr))%*%U%*%Da
-plot(F[,1],F[,2],type="n")
-text(F[,1],F[,2],label=rownames(X))
-
-G=sqrt(solve(Dc))%*%V%*%Da
-plot(G[,1],G[,2],type="n")
-text(G[,1],G[,2],label=colnames(X))
+########################For GARCH
+library(lubridate)
+library(tseries)
+library(rugarch)
+library(FinTS)
+library(e1071)
+library(forecast)
+library(xts)
 
 
-library(ca)
-fit=ca(X)
-summary(fit)
-plot(fit)
+# i)) Read the data 
+## plot the data and make it into return series
+aal_data <- read.csv(file.choose())
+aal_data$date <- mdy(aal_data$date)
+# make the data into time series
+aal_xts <- xts(aal_data$AAL, order.by = aal_data$date)
+
+head(aal_xts)
+
+# Plot
+plot(aal_xts, main = "AAL Stock Price", ylab = "Price")
 
 
+# convert xts to ts data
+aal_ts <- as.ts(aal_xts)   ## this ts data is needed for ARIMA modeling and forecasting
+plot(aal_ts)
 
 
-####################problem_2
+## check stationarity through unit root test
 
-y1<- c(115.3,151.0,132.2,143.8,95.3,93.7,98.8,141.5,139.8,121.8,89.1,158.4,139.5,110.9,97.2)
-y2<- c(280.1,354.6,325.6,330.4,202.4,237.8,224.1,342.8,349.9,313.5,246.0,368.7,302.9,275.8,236.4)
-z1<- c(116.2,156.6,141.2,131.9,100.9,100.9,94.1,150.6,132.1,139.6,91.4,157.9,148.3,104.9,102.7)
-z2<- c(5.485,4.603,3.267,6.313,1.825,3.275,3.98,4.833,7.959,2.397,5.385,6.128,0.941,6.272,2.12)
-n=length(y1)
-fit=lm(cbind(y1,y2)~z1+z2)
-summary(fit)
+adf.test(aal_ts)            
+pp.test(aal_ts)
+## make the data into return series
+aal=diff(log(aal_ts));aal
 
-beta.hat=fit$coefficients;beta.hat
+##ii)) ##  plot the return Series
 
-z_val=c(1,147.2,3.50)
-pred=z_val%*%(fit$coefficients);pred
-
-res_ful=fit$residuals
-
-fit.res=lm(cbind(y1,y2)~z1)
-res_restricted=fit.res$residuals
-sigma.ful=(t(res_ful)%*%res_ful)/n
-sigma.restrict=t(res_restricted)%*%res_restricted/n
-m=2
-r=2
-q=1
-chi.test=-(n-r-1-((m-r+q+1)/2))*(log(det(sigma.ful))-log(det(sigma.restrict)))
-chi.test
-df=m*(r-q)
-pvalue=1-pchisq(chi.test,df);pvalue
+plot(aal,type="l")
+adf.test(aal)
 
 
-
-
-#####################Problem_3
-
-X1 <-c(4.8,6.2,6.8,6.2,7.1,5.0,3.4,5.1,5.9,4.1,4.5,3.7,4.8,4.2,6.2,5.3,6.0,5.1,
-       4.7,3.7,4.3,3.8,4.7,4.1,4.5,5.0,5.6,4.8,5.3,4.9,6.2,6.8,7.2,6.5,6.9,4.2,
-       5.4,6.6,5.1,3.7,4.0,5.0,4.1,4.2,4.6,5.8,5.4,3.7,6.6,4.2,6.0,4.0,4.2,6.5,
-       6.4,3.9,5.9,7.5,4.0,4.8,4.9,6.5,5.0,4.2,6.6,4.8,3.8,6.0,4.6,5.3,6.4,5.1,
-       4.4,3.9,6.7,4.5,6.3,5.0,4.0,6.1) 
-X2 <- c(4.5,4.7,5.3,4.7,5.4,4.7,3.7,5.2,4.7,4.2,4.5,3.8,4.8,5.6,4.7,4.7,4.6,4.4,
-        4.9,4.0,4.1,3.6,4.4,3.9,4.2,5.1,5.3,5.2,4.9,5.0,4.8,5.4,5.7,5.1,5.5,4.0,
-        5.2,5.3,4.8,3.8,5.8,5.0,5.3,4.1,5.4,4.0,4.5,4.0,4.9,6.0,4.0,3.8,5.8,5.3,
-        5.3,3.6,5.1,5.7,3.7,5.3,4.4,4.9,5.0,4.0,5.2,5.1,3.9,4.5,5.3,4.1,4.8,4.0,
-        4.2,3.5,5.5,5.0,4.9,4.6,3.9,5.3) 
-classes <- c(1,3,3,3,3,2,1,2,3,1,1,1,1,2,3,2,3,2,2,1,1,1,1,1,1,2,2,2,2,2,3,3,3,3
-             ,3,1,2,3,2,1,2,2,2,2,2,2,2,1,3,2,2,1,2,3,3,1,2,3,1,2,1,3,2,1,3,2,1,
-             3,2,2,3,2,1,1,3,2,3,2,1,3) 
-mvnmix=data.frame(X1,X2,classes)
-
-plot(mvnmix$X1,mvnmix$X2,col=c("red","blue","green")[mvnmix$classes],
-     main="Plot of the data",xlab="X_1",ylab="X_2")
-legend("top",cex=0.6,legend=c("Class_1","Class_2","Class_3"),col=c("red","blue","green"),pch=16)
-
-
-library(mixtools)
-model=mvnormalmixEM(mvnmix[,1:2],k=3)
-summary(model)
-
-model$mu
-model$sigma
-
-plot(model,which=2)
-
-
-###################problem-4
-library(MASS)
-set.seed(4105)
-s1=0.65*sin((1:1000)/19+ 0.59* pi) + mvrnorm(n=1000,mu=0.02,Sigma=0.004)
-s2=sin(1:1000/33)+mvrnorm(1000,0.02,0.004)
-
-par(mfrow=c(2,1))
-plot(s1)
-plot(s2)
- 
-A=matrix(c(1,1.5,-1.5,3.30),nrow=2,byrow=T)
-S=matrix(c(s1,s2),ncol=2)
-
-X=S%*%A
-dev.off()
-plot(X)
-plot(S)
-
-library(fastICA)
-fit=fastICA(X,2,alg.typ = "parallel",fun="logcosh",method="C",verbose = T,maxit = 200,tol = 0.0001)
-
-
+## iii)) Find the acf and pacf and and check ARCH effect.
+##Fitting mean model
 par(mfrow=c(2,2))
-plot(1:1000,S[,1],main="Observed 1st signal")
-plot(1:1000,S[,2],main="Observed 1st signal")
-plot(1:1000,fit$S[,1],main="Observed 1st signal")
-plot(1:1000,fit$S[,2],main="Observed 1st signal")
+
+acf(aal, main="ACF of Returns")
+pacf(aal, main="PACF of Returns")
+acf(aal^2, main="ACF of Squared Returns")
+pacf(aal^2, main="PACF of Squared Returns")   ## if we have significant spike here that means here are ARCH effect.
+
+## find Appropriate ARIMA model                                             ## ARCH effect is also tested trough ARCH-LM test.
+
+arima_model <- auto.arima(aal_ts, seasonal = FALSE);arima_model
+# Extract the residuals
+residuals <- residuals(arima_model)
+residuals_sq=residuals^2
+## plot of residuals
+par(mfrow = c(2, 2))
+hist(residuals_sq, main = "Histogram of Residuals", xlab = "Residuals", col = "lightblue", breaks = 30)
+
+
+plot(density(residuals_sq), main = "Density Plot of Residuals")
+## Normality test
+# Normality Test
+shapiro.test(residuals_sq)
+jarque.bera.test(residuals_sq)      ## H0: residuals are normally distributed
+                                        ## we reject H0: residuals are not normal
+# Conduct the ARCH test
+arch_test <- ArchTest(residuals) ## bacground use ARCH-LM test
+print(arch_test)
+
+##d) 
+## Fit GARCH and TGARCH model
+
+aal_return <- na.omit(diff(log(aal_ts)))
+
+# GARCH(1,1)
+
+
+
+g_fit  <- ugarchfit(ugarchspec(variance.model = list(garchOrder=c(1,1))), 
+                    data = aal_return)
+##TGARCH(1,1)
+tg_fit <- ugarchfit(ugarchspec(variance.model = list(garchOrder=c(1,1), 
+                                                     model="gjrGARCH")), data = aal_return)
+ ## EGARCH(1,1)
+eg_fit <- ugarchfit( ugarchspec( variance.model = list( garchOrder = c(1,1),model = "eGARCH")),
+                      data = aal_return)                
+summary(g_fit)
+summary(tg_fit)
+summary(eg_fit)
+g_resid  <- residuals(g_fit)
+tg_resid <- residuals(tg_fit)
+eg_resid <- residuals(eg_fit)
+
+    ## lags 5 or 10 are standard
+ArchTest(g_resid, lags = 10)
+
+
+ArchTest(tg_resid, lags = 10)
+
+
+ArchTest(eg_resid, lags = 10)
+
+
+
+
+
+## e))
+# Compare the models using information criteria
+garch_aic <- infocriteria(g_fit);garch_aic
+tg_aic <- infocriteria(tg_fit) ;tg_aic ### TGARCH is best model
+eg_aic=infocriteria(eg_fit) ;eg_aic
+
+
+    ## EGARCH is the best
+
+
+## model accuracy check
+
+MSE=function(resid){mean(resid^2)}
+RMSE=function(resid){sqrt(mean(resid^2))}
+MAE=function(resid){mean(abs(resid))}
+
+mse=c(MSE(g_resid),MSE(tg_resid),MSE(eg_resid))
+rmse=c(RMSE(g_resid),RMSE(tg_resid),RMSE(eg_resid))
+mae=c(MAE(g_resid),MAE(tg_resid),MAE(eg_resid))
+
+results=data.frame(model_compare,mse,rmse,mae,
+                   row.names=c("g_fit","tg_fit3","eg_fit"))
+print(results)      #### EGARCH is best
+                         
+##estimate  the volatility
+## Estimated volatility
+eg_volatility <- sigma(eg_fit)
+
+
+## Plot
+plot(eg_volatility,
+     main = "Estimated Volatility from EGARCH(1,1)",
+     ylab = "Conditional Volatility",
+     col = "blue",
+     major.ticks = "years")
+
+
+
+
+#########################Cointegration#########################################
+library(urca)
+library(vars)
+library(tseries)
+library(lmtest)
+
+
+data(EuStockMarkets)
+
+plot(EuStockMarkets,col="blue",main="Daily closing values of major stock market indices of 3 countries")
+
+head(EuStockMarkets)
+Germany= EuStockMarkets[,1]
+switzerland=EuStockMarkets[,2]
+France= EuStockMarkets[,3]
+data<- data.frame(Germany,switzerland,France)
+head(data)
+dev.off()
+
+ts.plot(data,col=1:3)
+legend("topleft",inset=0.05,legend=colnames(data),col=1:3,lty=1,lwd=2)
+
+#ACF and PACF
+par(mfrow=c(3,2))
+
+acf(Germany,main="ACF of Daily closing values of Germany")
+pacf(Germany,main="PACF of Daily closing values of Germany")
+acf(France,main="ACF of Daily closing values of France")
+pacf(France,main="PACF of Daily closing values of France")
+acf(switzerland,main="ACF of Daily closing values of Uk")
+pacf(switzerland,main="PACF of Daily closing values of Uk")
+
+# Stationarity test
+
+adf.test(Germany)  #H₀:Non-Stationary
+pp.test(Germany)
+kpss.test(Germany) #H₀-Stationary
+
+adf.test(France)  #H₀:Non-Stationary
+pp.test(France)
+kpss.test(France)  #H₀-Stationary
+
+adf.test(switzerland)  #H₀:Non-Stationary
+pp.test(switzerland)
+kpss.test(switzerland) #H₀-Stationary
+
+# Differencing the log data
+dif_log_data=diff(log(data))
+
+adf.test(diff(log(Germany)))
+pp.test(diff(log(Germany)))
+kpss.test(diff(log(Germany)))
+
+adf.test(diff(log(France)))
+pp.test(diff(log(France)))
+kpss.test(diff(log(France)))
+
+adf.test(diff(log(switzerland)))
+pp.test(diff(log(switzerland)))
+kpss.test(diff(log(switzerland)))
+
+### Lag Length Selection
+VARselect(log(data))
+
+##Engle-Granger
+
+eg <- lm(Germany~switzerland+France, data)
+summary(eg)
+
+resid_eg <- residuals(eg)
+adf.test(resid_eg)
+pp.test(resid_eg)
+
+##Johansen Trace Test
+
+joh_trace <- ca.jo(
+  data,
+  type="trace",
+  ecdet="const",
+  K=10
+)
+
+summary(joh_trace)
+
+
+##Johansen Maximum Eigenvalue Test
+
+joh_eigen <- ca.jo(
+  data,
+  type="eigen",
+  ecdet="const",
+  K=10
+)
+
+summary(joh_eigen)
+
+#Equation
+joh_trace@V
+
+#VECTOR ERROR CORRECTION MODEL (VECM)
+
+vecm <- cajorls(joh_trace, r = 1)
+
+summary(vecm$rlm)
+
+###Convert VECM to VAR Form
+
+vec_var <- vec2var(joh_trace,r = 1)
+
+##diagnosis test 
+normality.test(vec_var)
+arch.test(vec_var,lags.multi = 12)
+
+
+
+
+
