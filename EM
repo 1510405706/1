@@ -1,262 +1,268 @@
-########################For GARCH
-library(lubridate)
-library(tseries)
-library(rugarch)
-library(FinTS)
-library(e1071)
-library(forecast)
-library(xts)
+####Problem_1_Churn##########
+library(reshape) 
+library(ggplot2)
+library(randomForest)
+library(caret)
+library(RANN)
+library(class)
 
-
-# i)) Read the data 
-## plot the data and make it into return series
-aal_data <- read.csv(file.choose())
-aal_data$date <- mdy(aal_data$date)
-# make the data into time series
-aal_xts <- xts(aal_data$AAL, order.by = aal_data$date)
-
-head(aal_xts)
-
-# Plot
-plot(aal_xts, main = "AAL Stock Price", ylab = "Price")
-
-
-# convert xts to ts data
-aal_ts <- as.ts(aal_xts)   ## this ts data is needed for ARIMA modeling and forecasting
-plot(aal_ts)
-
-
-## check stationarity through unit root test
-
-adf.test(aal_ts)            
-pp.test(aal_ts)
-## make the data into return series
-aal=diff(log(aal_ts));aal
-
-##ii)) ##  plot the return Series
-
-plot(aal,type="l")
-adf.test(aal)
-
-
-## iii)) Find the acf and pacf and and check ARCH effect.
-##Fitting mean model
-par(mfrow=c(2,2))
-
-acf(aal, main="ACF of Returns")
-pacf(aal, main="PACF of Returns")
-acf(aal^2, main="ACF of Squared Returns")
-pacf(aal^2, main="PACF of Squared Returns")   ## if we have significant spike here that means here are ARCH effect.
-
-## find Appropriate ARIMA model                                             ## ARCH effect is also tested trough ARCH-LM test.
-
-arima_model <- auto.arima(aal_ts, seasonal = FALSE);arima_model
-# Extract the residuals
-residuals <- residuals(arima_model)
-residuals_sq=residuals^2
-## plot of residuals
-par(mfrow = c(2, 2))
-hist(residuals_sq, main = "Histogram of Residuals", xlab = "Residuals", col = "lightblue", breaks = 30)
-
-
-plot(density(residuals_sq), main = "Density Plot of Residuals")
-## Normality test
-# Normality Test
-shapiro.test(residuals_sq)
-jarque.bera.test(residuals_sq)      ## H0: residuals are normally distributed
-                                        ## we reject H0: residuals are not normal
-# Conduct the ARCH test
-arch_test <- ArchTest(residuals) ## bacground use ARCH-LM test
-print(arch_test)
-
-##d) 
-## Fit GARCH and TGARCH model
-
-aal_return <- na.omit(diff(log(aal_ts)))
-
-# GARCH(1,1)
-
-
-
-g_fit  <- ugarchfit(ugarchspec(variance.model = list(garchOrder=c(1,1))), 
-                    data = aal_return)
-##TGARCH(1,1)
-tg_fit <- ugarchfit(ugarchspec(variance.model = list(garchOrder=c(1,1), 
-                                                     model="gjrGARCH")), data = aal_return)
- ## EGARCH(1,1)
-eg_fit <- ugarchfit( ugarchspec( variance.model = list( garchOrder = c(1,1),model = "eGARCH")),
-                      data = aal_return)                
-summary(g_fit)
-summary(tg_fit)
-summary(eg_fit)
-g_resid  <- residuals(g_fit)
-tg_resid <- residuals(tg_fit)
-eg_resid <- residuals(eg_fit)
-
-    ## lags 5 or 10 are standard
-ArchTest(g_resid, lags = 10)
-
-
-ArchTest(tg_resid, lags = 10)
-
-
-ArchTest(eg_resid, lags = 10)
-
-
-
-
-
-## e))
-# Compare the models using information criteria
-garch_aic <- infocriteria(g_fit);garch_aic
-tg_aic <- infocriteria(tg_fit) ;tg_aic ### TGARCH is best model
-eg_aic=infocriteria(eg_fit) ;eg_aic
-
-
-    ## EGARCH is the best
-
-
-## model accuracy check
-
-MSE=function(resid){mean(resid^2)}
-RMSE=function(resid){sqrt(mean(resid^2))}
-MAE=function(resid){mean(abs(resid))}
-
-mse=c(MSE(g_resid),MSE(tg_resid),MSE(eg_resid))
-rmse=c(RMSE(g_resid),RMSE(tg_resid),RMSE(eg_resid))
-mae=c(MAE(g_resid),MAE(tg_resid),MAE(eg_resid))
-
-results=data.frame(model_compare,mse,rmse,mae,
-                   row.names=c("g_fit","tg_fit3","eg_fit"))
-print(results)      #### EGARCH is best
-                         
-##estimate  the volatility
-## Estimated volatility
-eg_volatility <- sigma(eg_fit)
-
-
-## Plot
-plot(eg_volatility,
-     main = "Estimated Volatility from EGARCH(1,1)",
-     ylab = "Conditional Volatility",
-     col = "blue",
-     major.ticks = "years")
-
-
-
-
-#########################Cointegration#########################################
-library(urca)
-library(vars)
-library(tseries)
-library(lmtest)
-
-
-data(EuStockMarkets)
-
-plot(EuStockMarkets,col="blue",main="Daily closing values of major stock market indices of 3 countries")
-
-head(EuStockMarkets)
-Germany= EuStockMarkets[,1]
-switzerland=EuStockMarkets[,2]
-France= EuStockMarkets[,3]
-data<- data.frame(Germany,switzerland,France)
+data <- read.csv(file.choose())
 head(data)
-dev.off()
+str(data)
+churn <- data
+summary(churn)
+head(churn)
+names(churn)
 
-ts.plot(data,col=1:3)
-legend("topleft",inset=0.05,legend=colnames(data),col=1:3,lty=1,lwd=2)
+names(churn) <- c("State","Account.length","Area.code","Phone",
+                  "Int.l.Plan","VMail.Plan","VMail.Message","Day.Mins","Day.Calls",
+                  "Day.Charge","Eve.Mins","Eve.Calls","Eve.Charge","Night.Mins",
+                  "Night.Calls","Night.Charge","Intl.Mins","Intl.Calls",
+                  "Intl.Charge","CustServ.Calls","Churn")
+head(churn)
+names(churn)
+str(churn)
+# transformation by min-max normalization
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+churn_n_normalize <- as.data.frame(lapply(churn[,c(8,9,10,11,12,13,14,15,16,17,19)], normalize))
+str(churn_n_normalize)
+summary(churn_n_normalize)
 
-#ACF and PACF
-par(mfrow=c(3,2))
+#transformation by z-score standarization
+churn_n_standarized <- as.data.frame( scale(churn[,c(8,9,10,11,12,13,14,15,16,17,19)]))
+str(churn_n_standarized)
+summary(churn_n_standarized)
 
-acf(Germany,main="ACF of Daily closing values of Germany")
-pacf(Germany,main="PACF of Daily closing values of Germany")
-acf(France,main="ACF of Daily closing values of France")
-pacf(France,main="PACF of Daily closing values of France")
-acf(switzerland,main="ACF of Daily closing values of Uk")
-pacf(switzerland,main="PACF of Daily closing values of Uk")
+#Plot the data
 
-# Stationarity test
+#qplot(Int.l.Plan, data =churn,colour=Churn)
 
-adf.test(Germany)  #H₀:Non-Stationary
-pp.test(Germany)
-kpss.test(Germany) #H₀-Stationary
+ggplot(churn, aes(x = Int.l.Plan, fill = Churn)) + geom_bar()
+ggplot(churn, aes(x = Int.l.Plan, fill = Churn)) + geom_bar(position = "fill")
 
-adf.test(France)  #H₀:Non-Stationary
-pp.test(France)
-kpss.test(France)  #H₀-Stationary
+ggplot(churn, aes(x = VMail.Plan, fill = Churn)) + geom_bar()
+ggplot(churn, aes(x = VMail.Plan, fill = Churn)) + geom_bar(position = "fill")
 
-adf.test(switzerland)  #H₀:Non-Stationary
-pp.test(switzerland)
-kpss.test(switzerland) #H₀-Stationary
 
-# Differencing the log data
-dif_log_data=diff(log(data))
+# two way interaction
+qplot(Day.Mins, CustServ.Calls, data =churn,colour=Churn)
 
-adf.test(diff(log(Germany)))
-pp.test(diff(log(Germany)))
-kpss.test(diff(log(Germany)))
 
-adf.test(diff(log(France)))
-pp.test(diff(log(France)))
-kpss.test(diff(log(France)))
+#create frequency table
+attach(churn)
+mytable <- table(Int.l.Plan,Churn) 
+mytable # print table 
+mytable <- table(VMail.Plan,Churn) 
+mytable # print table 
 
-adf.test(diff(log(switzerland)))
-pp.test(diff(log(switzerland)))
-kpss.test(diff(log(switzerland)))
+#Pairwise correlation
+#churn
+pairs(~Day.Mins+Day.Calls+Day.Charge,data=churn)
+pairs(~Eve.Mins+Eve.Calls+Eve.Charge,data=churn)
+pairs(~Night.Mins+Night.Calls+Night.Charge,data=churn)
 
-### Lag Length Selection
-VARselect(log(data))
+pairs(~Day.Mins+Day.Calls+Day.Charge+Eve.Mins+Eve.Calls+Eve.Charge+Night.Mins+Night.Calls+Night.Charge,data=churn)
 
-##Engle-Granger
 
-eg <- lm(Germany~switzerland+France, data)
-summary(eg)
 
-resid_eg <- residuals(eg)
-adf.test(resid_eg)
-pp.test(resid_eg)
 
-##Johansen Trace Test
+#Problem_2_KNN_
+# Answer to question no. a
+library(class)
+# Create the data set using Table 1
+new <- c(0.05,0.25)
+A <- c(0.0467, 0.2471)
+B <- c(0.0533, 0.1912)
+C <- c(0.0917, 0.2794)
+D <- c(0.0522, 0.2188)
+E <- c(0.0478, 0.1987)
+data <- rbind(new, A, B, C, D, E)
+data
 
-joh_trace <- ca.jo(
-  data,
-  type="trace",
-  ecdet="const",
-  K=10
+# Answer to question no. b	
+data <- rbind(A, B, C, D, E)
+# Declare true classifications of A, B, and C
+trueclass <- c("Dark", "Medium", "Medium", "Light", "Light")
+# Answer to question no. c
+knn(data,new,cl = trueclass,k = 5,prob = TRUE)
+
+# Answer to question no. d
+# distance values from New
+ds_newA <- sqrt((new[1]-A[1])^2+(new[2]-A[2])^2)
+ds_newB <- sqrt((new[1]-B[1])^2+(new[2]-B[2])^2)
+ds_newC <- sqrt((new[1]-C[1])^2+(new[2]-C[2])^2)
+ds_newD <- sqrt((new[1]-D[1])^2+(new[2]-D[2])^2)
+ds_newE <- sqrt((new[1]-E[1])^2+(new[2]-E[2])^2)
+# weighted voting
+Votes_Dark=1/(ds_newA)^2
+Votes_Medium=(1/(ds_newB)^2)+(1/(ds_newC)^2)
+Votes_Light=(1/(ds_newD)^2)+(1/(ds_newE)^2)
+Votes_Dark
+Votes_Medium
+Votes_Light
+
+# Answer to question no. e & f
+# Stretch the axes
+ds_newA <- sqrt((new[1]-A[1])^2+(3*(new[2]-A[2]))^2)
+ds_newB <- sqrt((new[1]-B[1])^2+(3*(new[2]-B[2]))^2)
+ds_newC <- sqrt((new[1]-C[1])^2+(3*(new[2]-C[2]))^2)
+ds_newD <- sqrt((new[1]-D[1])^2+(3*(new[2]-D[2]))^2)
+ds_newE <- sqrt((new[1]-E[1])^2+(3*(new[2]-E[2]))^2)
+# weighted voting for stretching axes
+Votes_Dark=1/(ds_newA)^2
+Votes_Medium=(1/(ds_newB)^2)+(1/(ds_newC)^2)
+Votes_Light=(1/(ds_newD)^2)+(1/(ds_newE)^2)
+Votes_Dark
+Votes_Medium
+Votes_Light
+
+# Answer to question no. g
+distance <- c(ds_newA,ds_newB,ds_newC,ds_newD,ds_newE)
+BP <- c(120, 122, 130, 125, 129)
+data <- cbind(BP, data, distance)
+data
+sum_wi=sum(1/distance^2)
+sum_wiyi=sum((BP[1]/(ds_newA)^2)+(BP[2]/(ds_newB)^2)+(BP[3]/(ds_newC)^2)+(BP[4]/(ds_newD)^2)+(BP[4]/(ds_newE)^2))
+y_new=(sum_wiyi/sum_wi)
+y_new
+
+
+
+
+############problem_5_Random_Forest#########
+# Answer to the question 5 (a)
+install.packages(c("RANN","caret"),dependencies = T)
+library(caret)
+library(RANN)
+
+set.seed(1)
+
+# Loading the hackathon dataset
+# Note: file.choose() opens an interactive window. 
+# Alternatively, you can uncomment the line below to load directly from the web:
+# data <- read.csv('https://datahack-prod.s3.ap-south-1.amazonaws.com/train_file/train_u6lujuX_CVtuZ9i.csv')
+data <- read.csv(file.choose())
+
+# Ensure the target variable is a proper factor for classification (b)
+data$Loan_Status <- as.factor(data$Loan_Status)
+str(data)
+dim(data)
+
+# Does the data contain missing values (C)
+sum(is.na(data))
+# Imputing missing values using median, centering, and scaling
+preProcValues <- preProcess(data, method = c("medianImpute", "center", "scale"))
+data_processed <- predict(preProcValues, data)
+sum(is.na(data_processed))
+
+# Splitting training set into two parts based on outcome: 75% and 25% (d)
+index <- createDataPartition(data_processed$Loan_Status, p = 0.75, list = FALSE)
+trainSet <- data_processed[index, ]
+testSet <- data_processed[-index, ]
+
+# Defining the training controls for multiple models
+fitControl <- trainControl(
+  method = "cv",
+  number = 5,
+  savePredictions = 'final',
+  classProbs = TRUE
 )
 
-summary(joh_trace)
+# Defining the predictors and outcome
+predictors <- c("Credit_History", "LoanAmount", "Loan_Amount_Term", "ApplicantIncome", "CoapplicantIncome")
+outcomeName <- "Loan_Status"
 
-
-##Johansen Maximum Eigenvalue Test
-
-joh_eigen <- ca.jo(
-  data,
-  type="eigen",
-  ecdet="const",
-  K=10
+# Training the random forest model (e)
+model_rf <- train(
+  trainSet[, predictors], 
+  trainSet[, outcomeName], 
+  method = 'rf', 
+  trControl = fitControl, 
+  tuneLength = 3
 )
+print(model_rf)
 
-summary(joh_eigen)
+# Predicting using random forest model
+testSet$pred_rf <- predict(object = model_rf, testSet[, predictors])
 
-#Equation
-joh_trace@V
+# Checking the accuracy of the random forest model
+# (Removed the arbitrary 1:100 levels since Loan_Status is binary 'Y'/'N')
+confusionMatrix(testSet$pred_rf, testSet$Loan_Status)
 
-#VECTOR ERROR CORRECTION MODEL (VECM)
+############
+#Training the knn model (f)
+model_knn<-train(trainSet[,predictors],trainSet[,outcomeName],method='knn',trControl=fitControl,tuneLength=3)
+#Predicting using knn model
+testSet$pred_knn<-predict(object = model_knn,testSet[,predictors])
+#Checking the accuracy of the random forest model
+confusionMatrix(testSet$Loan_Status,testSet$pred_knn)
 
-vecm <- cajorls(joh_trace, r = 1)
+#Training the Logistic regression model (g)
+model_lr<-train(trainSet[,predictors],trainSet[,outcomeName],method='glm',trControl=fitControl,tuneLength=3)
+#Predicting using knn model
+testSet$pred_lr<-predict(object = model_lr,testSet[,predictors])
+#Checking the accuracy of the random forest model
+confusionMatrix(testSet$Loan_Status,testSet$pred_lr)
 
-summary(vecm$rlm)
+#########
+#Predicting the probabilities
+testSet$pred_rf_prob<-predict(object = model_rf,testSet[,predictors],type='prob')
+testSet$pred_knn_prob<-predict(object = model_knn,testSet[,predictors],type='prob')
+testSet$pred_lr_prob<-predict(object = model_lr,testSet[,predictors],type='prob')
 
-###Convert VECM to VAR Form
 
-vec_var <- vec2var(joh_trace,r = 1)
+#The majority vote (h)
+testSet$pred_majority<-as.factor(ifelse(testSet$pred_rf=='Y' & testSet$pred_knn=='Y','Y',ifelse(testSet$pred_rf=='Y' & testSet$pred_lr=='Y','Y',ifelse(testSet$pred_knn=='Y' & testSet$pred_lr=='Y','Y','N'))))
+#Splitting into binary classes at 0.5
+#testSet$pred_weighted_avg<-as.factor(ifelse(testSet$pred_weighted_avg>0.5,'Y','N'))
+confusionMatrix(testSet$Loan_Status,testSet$pred_majority)
 
-##diagnosis test 
-normality.test(vec_var)
-arch.test(vec_var,lags.multi = 12)
+
+
+
+
+##########Problem_8_Random forest
+
+# Load the library
+library(randomForest)
+
+# Set random seed for reproducibility
+set.seed(42)
+
+# Sample row indices for training data (70% of the dataset)
+train_indices <- sample(1:nrow(iris), 0.7 * nrow(iris))
+
+# Split the dataset
+train_data <- iris[train_indices, ]
+test_data  <- iris[-train_indices, ]
+
+# Train a classification model
+rf_model <- randomForest(Species ~ ., 
+                         data = train_data, 
+                         ntree = 500,        # Number of decision trees to grow
+                         mtry = 2,           # Variables tried at each split
+                         importance = TRUE)  # Calculate feature importance
+
+# Print basic model summary
+print(rf_model)
+
+# Predict on testing data
+predictions <- predict(rf_model, newdata = test_data)
+
+# Generate a confusion matrix to evaluate accuracy
+evaluation_matrix <- table(Observed = test_data$Species, Predicted = predictions)
+print(evaluation_matrix)
+
+# Calculate overall accuracy
+accuracy <- sum(diag(evaluation_matrix)) / sum(evaluation_matrix)
+print(paste("Test Accuracy:", round(accuracy * 100, 2), "%"))
+
+# Plot the importance of each feature
+
+importance(rf_model)
+varImpPlot(rf_model)
 
 
 
