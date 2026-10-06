@@ -1,270 +1,42 @@
-####Problem_1_Churn##########
-library(reshape) 
-library(ggplot2)
-library(randomForest)
-library(caret)
-library(RANN)
-library(class)
+# install "dplyr" package
+#install.packages("dplyr")
+# Load the dplyr package
+library(dplyr)
+#Setup your working directory
+setwd("F:/Bioinformatics/For Poster/THC")
 
-data <- read.csv(file.choose())
-head(data)
-str(data)
-churn <- data
-summary(churn)
-head(churn)
-names(churn)
+# Load the dataset
+results=read.csv("GSE3678.top.table.csv", header=TRUE)
+head(results)
+dim(results)
 
-names(churn) <- c("State","Account.length","Area.code","Phone",
-                  "Int.l.Plan","VMail.Plan","VMail.Message","Day.Mins","Day.Calls",
-                  "Day.Charge","Eve.Mins","Eve.Calls","Eve.Charge","Night.Mins",
-                  "Night.Calls","Night.Charge","Intl.Mins","Intl.Calls",
-                  "Intl.Charge","CustServ.Calls","Churn")
-head(churn)
-names(churn)
-str(churn)
-# transformation by min-max normalization
-normalize <- function(x) {
-  return ((x - min(x)) / (max(x) - min(x)))
-}
-churn_n_normalize <- as.data.frame(lapply(churn[,c(8,9,10,11,12,13,14,15,16,17,19)], normalize))
-str(churn_n_normalize)
-summary(churn_n_normalize)
+##Select Upregulated genes
+Upregulated_data<- results %>% filter(  adj.P.Val <0.05 & logFC >1.5)
+dim(Upregulated_data)
+head(Upregulated_data)
+UPDE <- dplyr::filter(Upregulated_data, !is.na(Gene.symbol))
+tail(UPDE )
+dim(UPDE )
+write.csv(UPDE ,file="UPDE_1.csv")
 
-#transformation by z-score standarization
-churn_n_standarized <- as.data.frame( scale(churn[,c(8,9,10,11,12,13,14,15,16,17,19)]))
-str(churn_n_standarized)
-summary(churn_n_standarized)
+##Select Downregulated genes
+Downregulated_data <- results %>% filter(  adj.P.Val <0.05 & logFC < -1.5)
+dim(Downregulated_data)
+head(Downregulated_data)
+DownDE <- dplyr::filter(Downregulated_data, !is.na(Gene.symbol))
+tail(DownDE)
+dim(DownDE)
+write.csv(DownDE,file="DownDE_1.csv")
 
-#Plot the data
+#################################
+#DownDEN <- read.csv("DownDE_1.csv",header=T)
+#length(unique(DownDEN$Gene.symbol))
+#DE_D <- unique(DownDEN$Gene.symbol)
 
-#qplot(Int.l.Plan, data =churn,colour=Churn)
-
-ggplot(churn, aes(x = Int.l.Plan, fill = Churn)) + geom_bar()
-ggplot(churn, aes(x = Int.l.Plan, fill = Churn)) + geom_bar(position = "fill")
-
-ggplot(churn, aes(x = VMail.Plan, fill = Churn)) + geom_bar()
-ggplot(churn, aes(x = VMail.Plan, fill = Churn)) + geom_bar(position = "fill")
-
-
-# two way interaction
-qplot(Day.Mins, CustServ.Calls, data =churn,colour=Churn)
-
-
-#create frequency table
-attach(churn)
-mytable <- table(Int.l.Plan,Churn) 
-mytable # print table 
-mytable <- table(VMail.Plan,Churn) 
-mytable # print table 
-
-#Pairwise correlation
-#churn
-pairs(~Day.Mins+Day.Calls+Day.Charge,data=churn)
-pairs(~Eve.Mins+Eve.Calls+Eve.Charge,data=churn)
-pairs(~Night.Mins+Night.Calls+Night.Charge,data=churn)
-
-pairs(~Day.Mins+Day.Calls+Day.Charge+Eve.Mins+Eve.Calls+Eve.Charge+Night.Mins+Night.Calls+Night.Charge,data=churn)
-
-
-
-
-#Problem_2_KNN_
-# Answer to question no. a
-library(class)
-# Create the data set using Table 1
-new <- c(0.05,0.25)
-A <- c(0.0467, 0.2471)
-B <- c(0.0533, 0.1912)
-C <- c(0.0917, 0.2794)
-D <- c(0.0522, 0.2188)
-E <- c(0.0478, 0.1987)
-data <- rbind(new, A, B, C, D, E)
-data
-
-# Answer to question no. b	
-data <- rbind(A, B, C, D, E)
-# Declare true classifications of A, B, and C
-trueclass <- c("Dark", "Medium", "Medium", "Light", "Light")
-# Answer to question no. c
-knn(data,new,cl = trueclass,k = 5,prob = TRUE)
-
-# Answer to question no. d
-# distance values from New
-ds_newA <- sqrt((new[1]-A[1])^2+(new[2]-A[2])^2)
-ds_newB <- sqrt((new[1]-B[1])^2+(new[2]-B[2])^2)
-ds_newC <- sqrt((new[1]-C[1])^2+(new[2]-C[2])^2)
-ds_newD <- sqrt((new[1]-D[1])^2+(new[2]-D[2])^2)
-ds_newE <- sqrt((new[1]-E[1])^2+(new[2]-E[2])^2)
-# weighted voting
-Votes_Dark=1/(ds_newA)^2
-Votes_Medium=(1/(ds_newB)^2)+(1/(ds_newC)^2)
-Votes_Light=(1/(ds_newD)^2)+(1/(ds_newE)^2)
-Votes_Dark
-Votes_Medium
-Votes_Light
-
-# Answer to question no. e & f
-# Stretch the axes
-ds_newA <- sqrt((new[1]-A[1])^2+(3*(new[2]-A[2]))^2)
-ds_newB <- sqrt((new[1]-B[1])^2+(3*(new[2]-B[2]))^2)
-ds_newC <- sqrt((new[1]-C[1])^2+(3*(new[2]-C[2]))^2)
-ds_newD <- sqrt((new[1]-D[1])^2+(3*(new[2]-D[2]))^2)
-ds_newE <- sqrt((new[1]-E[1])^2+(3*(new[2]-E[2]))^2)
-# weighted voting for stretching axes
-Votes_Dark=1/(ds_newA)^2
-Votes_Medium=(1/(ds_newB)^2)+(1/(ds_newC)^2)
-Votes_Light=(1/(ds_newD)^2)+(1/(ds_newE)^2)
-Votes_Dark
-Votes_Medium
-Votes_Light
-
-# Answer to question no. g
-distance <- c(ds_newA,ds_newB,ds_newC,ds_newD,ds_newE)
-BP <- c(120, 122, 130, 125, 129)
-data <- cbind(BP, data, distance)
-data
-sum_wi=sum(1/distance^2)
-sum_wiyi=sum((BP[1]/(ds_newA)^2)+(BP[2]/(ds_newB)^2)+(BP[3]/(ds_newC)^2)+(BP[4]/(ds_newD)^2)+(BP[4]/(ds_newE)^2))
-y_new=(sum_wiyi/sum_wi)
-y_new
-
-
-
-
-############problem_5_Random_Forest#########
-# Answer to the question 5 (a)
-install.packages(c("RANN","caret"),dependencies = T)
-library(caret)
-library(RANN)
-
-set.seed(1)
-
-# Loading the hackathon dataset
-# Note: file.choose() opens an interactive window. 
-# Alternatively, you can uncomment the line below to load directly from the web:
-# data <- read.csv('https://datahack-prod.s3.ap-south-1.amazonaws.com/train_file/train_u6lujuX_CVtuZ9i.csv')
-data <- read.csv(file.choose())
-
-# Ensure the target variable is a proper factor for classification (b)
-data$Loan_Status <- as.factor(data$Loan_Status)
-str(data)
-dim(data)
-
-# Does the data contain missing values (C)
-sum(is.na(data))
-# Imputing missing values using median, centering, and scaling
-preProcValues <- preProcess(data, method = c("medianImpute", "center", "scale"))
-data_processed <- predict(preProcValues, data)
-sum(is.na(data_processed))
-
-# Splitting training set into two parts based on outcome: 75% and 25% (d)
-index <- createDataPartition(data_processed$Loan_Status, p = 0.75, list = FALSE)
-trainSet <- data_processed[index, ]
-testSet <- data_processed[-index, ]
-
-# Defining the training controls for multiple models
-fitControl <- trainControl(
-  method = "cv",
-  number = 5,
-  savePredictions = 'final',
-  classProbs = TRUE
-)
-
-# Defining the predictors and outcome
-predictors <- c("Credit_History", "LoanAmount", "Loan_Amount_Term", "ApplicantIncome", "CoapplicantIncome")
-outcomeName <- "Loan_Status"
-
-# Training the random forest model (e)
-model_rf <- train(
-  trainSet[, predictors], 
-  trainSet[, outcomeName], 
-  method = 'rf', 
-  trControl = fitControl, 
-  tuneLength = 3
-)
-print(model_rf)
-
-# Predicting using random forest model
-testSet$pred_rf <- predict(object = model_rf, testSet[, predictors])
-
-# Checking the accuracy of the random forest model
-# (Removed the arbitrary 1:100 levels since Loan_Status is binary 'Y'/'N')
-confusionMatrix(testSet$pred_rf, testSet$Loan_Status)
-
-############
-#Training the knn model (f)
-model_knn<-train(trainSet[,predictors],trainSet[,outcomeName],method='knn',trControl=fitControl,tuneLength=3)
-#Predicting using knn model
-testSet$pred_knn<-predict(object = model_knn,testSet[,predictors])
-#Checking the accuracy of the random forest model
-confusionMatrix(testSet$Loan_Status,testSet$pred_knn)
-
-#Training the Logistic regression model (g)
-model_lr<-train(trainSet[,predictors],trainSet[,outcomeName],method='glm',trControl=fitControl,tuneLength=3)
-#Predicting using knn model
-testSet$pred_lr<-predict(object = model_lr,testSet[,predictors])
-#Checking the accuracy of the random forest model
-confusionMatrix(testSet$Loan_Status,testSet$pred_lr)
-
-#########
-#Predicting the probabilities
-testSet$pred_rf_prob<-predict(object = model_rf,testSet[,predictors],type='prob')
-testSet$pred_knn_prob<-predict(object = model_knn,testSet[,predictors],type='prob')
-testSet$pred_lr_prob<-predict(object = model_lr,testSet[,predictors],type='prob')
-
-
-#The majority vote (h)
-testSet$pred_majority<-as.factor(ifelse(testSet$pred_rf=='Y' & testSet$pred_knn=='Y','Y',ifelse(testSet$pred_rf=='Y' & testSet$pred_lr=='Y','Y',ifelse(testSet$pred_knn=='Y' & testSet$pred_lr=='Y','Y','N'))))
-#Splitting into binary classes at 0.5
-#testSet$pred_weighted_avg<-as.factor(ifelse(testSet$pred_weighted_avg>0.5,'Y','N'))
-confusionMatrix(testSet$Loan_Status,testSet$pred_majority)
-
-
-
-
-
-##########Problem_8_Random forest
-
-# Load the library
-library(randomForest)
-
-# Set random seed for reproducibility
-set.seed(42)
-
-# Sample row indices for training data (70% of the dataset)
-train_indices <- sample(1:nrow(iris), 0.7 * nrow(iris))
-
-# Split the dataset
-train_data <- iris[train_indices, ]
-test_data  <- iris[-train_indices, ]
-
-# Train a classification model
-rf_model <- randomForest(Species ~ ., 
-                         data = train_data, 
-                         ntree = 500,        # Number of decision trees to grow
-                         mtry = 2,           # Variables tried at each split
-                         importance = TRUE)  # Calculate feature importance
-
-# Print basic model summary
-print(rf_model)
-
-# Predict on testing data
-predictions <- predict(rf_model, newdata = test_data)
-
-# Generate a confusion matrix to evaluate accuracy
-evaluation_matrix <- table(Observed = test_data$Species, Predicted = predictions)
-print(evaluation_matrix)
-
-# Calculate overall accuracy
-accuracy <- sum(diag(evaluation_matrix)) / sum(evaluation_matrix)
-print(paste("Test Accuracy:", round(accuracy * 100, 2), "%"))
-
-# Plot the importance of each feature
-
-importance(rf_model)
-varImpPlot(rf_model)
-
-
-
-
-
+#UPDEN <- read.csv("UPDE_1.csv",header=T)
+#length(unique(UPDEN$Gene.symbol))
+#DE_U <- unique(UPDEN$Gene.symbol)
+#DEG <- c(DE_D,DE_U)
+DEG=c(unique(DownDE$Gene.symbol),unique(UPDE$Gene.symbol))
+length(DEG)
+write.csv(DEG,file="DEG_GSE3678.top.table.csv")
