@@ -1,42 +1,20 @@
-# install "dplyr" package
-#install.packages("dplyr")
-# Load the dplyr package
 library(dplyr)
-#Setup your working directory
-setwd("F:/Bioinformatics/For Poster/THC")
+library(readr)
+#Read Data
+setwd("D:\\Practical\\510")
 
-# Load the dataset
-results=read.csv("GSE3678.top.table.csv", header=TRUE)
-head(results)
-dim(results)
+g1<-read_tsv("GSE87630.top.table.tsv")
+upg<- g1%>%filter(adj.P.Val<.05 & logFC>.5)
+upg<- upg%>%filter(!is.na(Gene.symbol))
+upg<- unique(upg$Gene.symbol)
+length(upg)
+write.csv(upg,"Upregulated.csv")
 
-##Select Upregulated genes
-Upregulated_data<- results %>% filter(  adj.P.Val <0.05 & logFC >1.5)
-dim(Upregulated_data)
-head(Upregulated_data)
-UPDE <- dplyr::filter(Upregulated_data, !is.na(Gene.symbol))
-tail(UPDE )
-dim(UPDE )
-write.csv(UPDE ,file="UPDE_1.csv")
+dwg<- g1%>%filter(adj.P.Val<.05 & logFC< -.5)
+dwg<- dwg%>%filter(!is.na(Gene.symbol))
+dwg<- unique(dwg$Gene.symbol)
+length(dwg)
+write.csv(dwg,"Downregulated.csv")
 
-##Select Downregulated genes
-Downregulated_data <- results %>% filter(  adj.P.Val <0.05 & logFC < -1.5)
-dim(Downregulated_data)
-head(Downregulated_data)
-DownDE <- dplyr::filter(Downregulated_data, !is.na(Gene.symbol))
-tail(DownDE)
-dim(DownDE)
-write.csv(DownDE,file="DownDE_1.csv")
-
-#################################
-#DownDEN <- read.csv("DownDE_1.csv",header=T)
-#length(unique(DownDEN$Gene.symbol))
-#DE_D <- unique(DownDEN$Gene.symbol)
-
-#UPDEN <- read.csv("UPDE_1.csv",header=T)
-#length(unique(UPDEN$Gene.symbol))
-#DE_U <- unique(UPDEN$Gene.symbol)
-#DEG <- c(DE_D,DE_U)
-DEG=c(unique(DownDE$Gene.symbol),unique(UPDE$Gene.symbol))
-length(DEG)
-write.csv(DEG,file="DEG_GSE3678.top.table.csv")
+deg=c(upg,dwg);length(deg)
+write.csv(deg,"DEGs.csv")
