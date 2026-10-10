@@ -1,20 +1,222 @@
-library(dplyr)
-library(readr)
-#Read Data
-setwd("D:\\Practical\\510")
+# ============================================== 
+# PRACTICAL Problems
+# Data Science and Big Data Analytics
+# ===============================================
 
-g1<-read_tsv("GSE87630.top.table.tsv")
-upg<- g1%>%filter(adj.P.Val<.05 & logFC>.5)
-upg<- upg%>%filter(!is.na(Gene.symbol))
-upg<- unique(upg$Gene.symbol)
-length(upg)
-write.csv(upg,"Upregulated.csv")
+# Required libraries: 
+# plyr, ggplot2, randomForest, caret, rvest, dplyr
+# To install above packages -
 
-dwg<- g1%>%filter(adj.P.Val<.05 & logFC< -.5)
-dwg<- dwg%>%filter(!is.na(Gene.symbol))
-dwg<- unique(dwg$Gene.symbol)
-length(dwg)
-write.csv(dwg,"Downregulated.csv")
+install.packages(c("plyr", "ggplot2", "randomForest", "caret", "rvest", "dplyr"), dependencies=TRUE)
+# =========================================================
 
-deg=c(upg,dwg);length(deg)
-write.csv(deg,"DEGs.csv")
+library(randomForest)
+# Question No. 1, Q.1:
+# Bank Marketing Dataset with 50000 observation
+# =================================================
+
+# Q.1.(a) Data_preprocessing
+bmt.data <- read.csv("bmt50000.csv", header = TRUE, sep = ",")
+bmt.data=read.csv(choose.files())
+dim(bmt.data)
+str(bmt.data)
+n <- dim(bmt.data)[1]
+bmt.data$index <- c(1:n)
+head(bmt.data)
+
+library(plyr)
+Table.1 <- table(bmt.data$education)
+edu.num <- revalue(x = bmt.data$education, replace =
+                     c("illiterate" = 0, "basic.4y" = 4,
+                       "basic.6y" = 6, "basic.9y" = 9, "high.school" = 12,
+                       "professional.course" = 13,
+                       "university.degree" = 16, "unknown" = NA))
+Table.2 <- table(edu.num)
+bmt.data$education_numeric <- as.numeric(edu.num)
+bmt.data$age_z <- scale(x = bmt.data$age, center = TRUE, scale = TRUE)  #Standardization
+summary(bmt.data$age_z)
+
+bank_outliers <- bmt.data[ which(bmt.data$age_z < - 3
+                                   | bmt.data$age_z > 3), ]
+dim(bank_outliers)
+#============================================
+
+# Q.1.(b) 
+library(ggplot2)
+
+Figure.1 <- ggplot(bmt.data, aes(previous_outcome)) + geom_bar() +
+        coord_flip()
+Figure.2 <- ggplot(bmt.data, aes(previous_outcome)) + 
+        geom_bar(aes(fill = response)) + coord_flip()
+Figure.3 <- ggplot(bmt.data, aes(previous_outcome)) + 
+      geom_bar(aes(fill = response),
+           position = "fill") + coord_flip()
+
+Table.3 <- table(bmt.data$response, bmt.data$previous_outcome)
+Table.4 <- addmargins(A = Table.3, FUN = list(total = sum),
+                   quiet = TRUE)
+Table.5 <- round(prop.table(Table.3, margin = 2)*100, 1)
+
+bmt.data$age_binned <- cut(x = bmt.data$age, breaks =
+                               c(0, 27, 60.01, 100),
+  right = FALSE, labels = c("Under 27", "27 to 60", "Over 60"))
+
+Figure.4 <- ggplot(bmt.data, aes(age_binned)) + geom_bar(aes(fill = response)) + coord_flip()
+Table.6 <- table(bmt.data$response, bmt.data$age_bin); 
+Table.7 <- round(prop.table(Table.6, margin = 2)*100, 1)
+# -------------------------------------------
+
+# Q.1.(c)
+ID <- 4101      # Use the last 4 difits of your Student ID
+set.seed(ID)
+train_ind <- runif(n) < 0.80
+train_data <- bmt.data[train_ind, ]
+test_data <- bmt.data[ !train_ind, ]
+
+n.train <- dim(train_data)[1]
+Table.8 <- table(train_data$response)
+freq.no.yes <- table(train_data$response)
+freq.no.yes 
+freq.yes <- freq.no.yes[2]
+rare.per <- freq.yes/n.train * 100
+rare.per
+
+# Let us resample to increase the percentage of “yes” responses to 30%. 
+p <- 0.3
+records <- n.train
+rare <- freq.yes
+new.num = (p * records - rare)/(1-p)
+new.num
+new.num <- ceiling(new.num)
+new.num
+
+to.resample <- which(bmt.data$response == "yes")
+our.resample <- sample(x = to.resample, size = new.num, replace = TRUE)
+our.resample <- bmt.data[our.resample, ]
+dim(our.resample)[1]
+
+train_data_rebal <- rbind(train_data, our.resample)
+Table.9 <- table(train_data_rebal$response)
+Table.10 <- rbind(Table.9, round(prop.table(Table.9), 4))
+colnames(Table.10) <- c("Response = No", "Response = Yes");
+rownames(Table.10) <- c("Count", "Proportion")
+Table.10
+# ============================================
+
+
+# Question No. 2, Q.2:
+# ==========================================
+act.data <- read.table("act.txt", sep=",", header=TRUE)
+str(act.data)
+table(act.data$Marital.status)
+
+library(randomForest)
+library(caret)
+
+act.data$Income <- factor(act.data$Income)
+act.data$Marital.status <- factor(act.data$Marital.status)
+
+ID <- 4101      # Use the last 4 difits of your Student ID
+set.seed(ID)
+trainIndex <- createDataPartition(act.data$Income, p = 0.70, list = FALSE)
+train.data <- act.data[trainIndex, ]
+test.data <- act.data[-trainIndex, ]
+
+rf.model <- randomForest(formula = Income ~ Marital.status +
+                     Cap_Gains_Losses, data = train.data, 
+                     ntree = 100, type = 'classification')
+
+rf.model$predicted
+table(rf.model$predicted)
+
+predictions <- predict(rf.model, newdata = test.data)
+conf.matrix <- table(Actual = test.data$Income, Predicted = predictions)
+print(conf.matrix)
+
+accuracy <- sum(diag(conf.matrix)) / sum(conf.matrix)
+print(paste("Accuracy:", round(accuracy, 4)))
+
+error.rate <- 1 - accuracy
+print(c(accuracy, error.rate))
+# ============================================
+
+# Calculate metrics manually
+TP <- conf.matrix[2, 2] # True Positives
+TN <- conf.matrix[1, 1] # True Negatives
+FP <- conf.matrix[2, 1] # False Positives
+FN <- conf.matrix[1, 2] # False Negatives
+
+#Sensitivity (Recall): TP / (TP + FN)
+sensitivity <- TP / (TP + FN)
+cat("\nSensitivity (Recall):", round(sensitivity, 3))
+
+specificity <- TN / (TN + FP)
+cat("\nSpecificity:", round(specificity, 3))
+
+# Precision: TP / (TP + FP)
+precision <- TP / (TP + FP)
+cat("\nPrecision:", round(precision, 3))
+
+f1_score <- 2 * (precision * sensitivity) / (precision + sensitivity)
+cat("\nF1 Score:", round(f1_score, 3))
+# -------------------------------------------
+
+# =================================================
+# Question No. 3, Q.3
+# =================================================
+library(rvest)  # For web scraping
+library(dplyr)  # For data manipulation
+
+url <- "http://books.toscrape.com/"
+webpage <- read_html(url)
+
+# Extract book titles
+titles <- webpage %>%
+  html_nodes("h3 a") %>%
+  html_attr("title") %>%
+  na.omit()
+
+# Extract book prices
+prices <- webpage %>%
+  html_nodes(".price_color") %>%
+  html_text() %>%
+  gsub("£", "", .) %>%  # Remove currency symbol
+  as.numeric()
+
+# Extract star ratings 
+ratings <- webpage %>%
+  html_nodes(".star-rating") %>%
+  html_attr("class") %>%
+  gsub("star-rating ", "", .) %>%
+  factor(levels = c("One", "Two", "Three", "Four", "Five"),
+         labels = c(1, 2, 3, 4, 5)) %>%
+  as.numeric()
+
+books_data <- data.frame(
+  Title = titles[1:length(prices)],  
+  Price = prices,
+  Rating = ratings
+)
+
+head(books_data)
+
+avg_price_by_rating <- books_data %>%
+  group_by(Rating) %>%
+  summarise(Average_Price = mean(Price),
+            Count = n())
+
+print(avg_price_by_rating)
+
+hist(books_data$Price, 
+     main = "Distribution of Book Prices",
+     xlab = "Price (£)",
+     col = "lightblue")
+
+boxplot(Price ~ Rating, data = books_data,
+        main = "Book Prices by Rating",
+        xlab = "Star Rating",
+        ylab = "Price (£)",
+        col = rainbow(5))
+
+write.csv(books_data, "book_data.csv", row.names = FALSE)
+################################
